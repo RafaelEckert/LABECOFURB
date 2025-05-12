@@ -1,0 +1,251 @@
+---
+  title: "Rafael Rohling Eckert"
+  format: html
+  editor: visual
+---
+
+```{r}
+#| label: load-packages
+#| include: false
+
+library(tidyverse)
+library(WDI)
+library(ggplot2)
+library(dplyr)
+library(scales)
+library(countrycode)
+library(plotly)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+
+options(scipen = 999) # REMOVER A NOT. CIENT.
+
+# DADOS EM PAINEL
+dadosarmsEXP <- WDI(country = 'all', indicator = 'MS.MIL.XPRT.KD', extra = TRUE)
+
+dadosarmsEXP <- dadosarmsEXP %>%
+  filter(region != "Aggregates")
+
+dadosarmsEXP <- dadosarmsEXP %>%
+  mutate(grupo = case_when(
+    country == "Brazil" ~ "Brasil",
+    country == "United States" ~ "Estados Unidos",
+    country == "China" ~ "China",
+    country == "Russian Federation" ~ "Russia",
+    TRUE ~ "Outros"
+  ))
+
+dados_outros <- dadosarmsEXP %>% filter(grupo == "Outros")
+
+dados_selecionados <- dadosarmsEXP %>% filter(grupo != "Outros")
+
+# CORTE TRANSVERSAL
+dadosarmsEXP2023 <- WDI(country = 'all',
+                        indicator = 'MS.MIL.XPRT.KD',
+                        start = 2023, end = 2023)
+
+# SÉRIE TEMPORAL
+dadosarmsEXPBR <- WDI(country = 'BR',
+                      indicator = 'MS.MIL.XPRT.KD')
+```
+
+## VARIÁVEL
+
+A variável escolhida foi a quantidade de armas exportadas pelos países anualmente. Os dados foram buscados do WDI (World Development Indicators), pelo indicador 'MS.MIL.XPRT.KD'. A medida utilizada para medir a exportação é o valor das armas em dólares (US\$).
+
+O Brasil tem um defasagem no que diz respeito a exportação de valor agregado, os pordutos mais exportados pelo Brasil são commodities, as quais contribuem para o crescimento do PIB, mas que necessitam de um grande volume de mercadorias para gerar relevância. Em contrapartida, se o Brasil começar a industrializar seus produtos antes de exportá-los, poderá ter um grande impacto (positivo) na balança comercial.
+
+Essa área econômica tem um alto valor agregado e, se for bem explorada pelo Brasil, poderá contribuir no PIB significativamente. O Brasil possui uma grande indústria de aviação bélica reconhecida internacionalmente, mas, também, necessita ampliar seus investimentos para aumentar a gama de produtos bélicos fabricados e exportados, podendo se tornar referência mundial.
+
+Atualmente, a indústria bélica brasileira é responsável por empregar 40 mil pessoas diretamente na área e surge uma grande brexa no mercado de armas com o aumento de conflitos ao redor do mundo, possibilitando um aumento da indústria nesse setor.
+
+## GRÁFICO DE DADOS EM PAINEL
+
+No gráfico de dados em painel, logo abaixo, é possível identificar a quantidade de armas exportadas pelos países individualmente. O que se nota no gráfico é a grande diproporção entre as grandes potências econômicas mundiais. Outro aspecto é a liderança massiva por parte dos Estados Unidos, que se encontram na 1ª posição e, no gráfico, mantém-se em amarelo. Sobre a Rússia, observa-se uma queda nas exportações de armas em períodos de preparação de guerra, como a Guerra da Crimeia, em 2014, e a Guerra da Ucrânia, de 2022 até hoje em dia.
+
+```{r}
+#| label: grafpainelarmsEXP
+#| warning: false
+#| echo: false
+
+# Gráfico com texto para hover
+grafpainelarmsEXP <- ggplot() + 
+  geom_line(data = dados_outros, aes(x = year, y = MS.MIL.XPRT.KD, group = country,
+                                     text = paste("País:", country,
+                                                  "<br>Ano:", year,
+                                                  "<br>Exportações: US$", round(MS.MIL.XPRT.KD / 1e9, 2), "B")),
+            color = "gray80", size = 0.5, alpha = 0.7) +
+  geom_line(data = dados_selecionados, aes(x = year, y = MS.MIL.XPRT.KD, color = grupo, group = country,
+                                           text = paste("País:", country,
+                                                        "<br>Ano:", year,
+                                                        "<br>Exportações: US$", round(MS.MIL.XPRT.KD / 1e9, 2), "B")),
+            size = 0.9) +
+  scale_color_manual(values = c(
+    "Brasil" = "forestgreen",
+    "Estados Unidos" = "gold",
+    "China" = "deeppink",
+    "Russia" = "deepskyblue"
+  )) +
+  ggtitle("Exportações de Armas por Ano (US$ Bilhões)") +
+  labs(x = "Ano", y = "Exportações de Armas", color = "País") +
+  scale_y_continuous(labels = label_number(scale = 1e-9, suffix = "B", prefix = "US$ ")) +
+  theme_minimal(base_family = "Arial") +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10)
+  )
+
+# Gráfico interativo
+ggplotly(grafpainelarmsEXP, tooltip = "text")
+```
+
+## GRÁFICO DE DADOS DE CORTE TRANSVERSAL
+
+No gráfico de dados de corte transversal, logo abaixo, é possível identificar a exportação de armas que os países tiveram no ano de 2023, no qual o Brasil encontra-se em verde. Os EUA mantém a firme liderança, com grande vantagem perante os outros países e uma grande exportação para Ucrânia, assim como a Alemanha que recentemente aumentou suas produções no setor. A China segue com a liderança nas exportações com vendas para a Rússia.
+
+```{r}
+#| label: grafcortearmsEXP2023 
+#| warning: false 
+#| echo: false  
+
+dados_paises <- dadosarmsEXP2023 %>%
+  filter(iso3c %in% countrycode::codelist$iso3c) %>%
+  filter(!is.na(MS.MIL.XPRT.KD))
+
+top15 <- dados_paises %>%
+  arrange(desc(MS.MIL.XPRT.KD)) %>%
+  slice(1:15)
+
+brasil <- filter(dados_paises, country == "Brazil")
+if (!(brasil$country %in% top15$country) & nrow(brasil) == 1) {
+  top15 <- bind_rows(top15, brasil)
+}
+
+# Cores + ordenação com fct_reorder
+library(forcats)
+top15 <- top15 %>%
+  mutate(
+    country = fct_reorder(country, MS.MIL.XPRT.KD),
+    cor = case_when(
+      country == "Brazil" ~ "forestgreen",
+      country == "China" ~ "deeppink",
+      country == "Russian Federation" ~ "blue",
+      country == "United States" ~ "gold",
+      TRUE ~ "gray60"
+    ),
+    texto_hover = paste0(
+      "País: ", country, "\n",
+      "Exportações: US$ ", round(MS.MIL.XPRT.KD / 1e9, 2), "B"
+    )
+  )
+
+# Gráfico com texto de tooltip
+grafbararmsEXP2023 <- ggplot(top15, aes(x = MS.MIL.XPRT.KD / 1e9, y = country, fill = cor, text = texto_hover)) +
+  geom_col() +
+  scale_fill_identity() +
+  scale_x_continuous(labels = label_dollar(scale = 1, suffix = "B", prefix = "US$ ")) +
+  labs(
+    title = "Maiores Exportadores de Armas em 2023",
+    x = "Esportações de Armas",
+    y = "Países Exportadores"
+  ) +
+  theme_minimal(base_family = "Helvetica") +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, color = "#333333"),
+    axis.title = element_text(size = 12, color = "#333333"),
+    axis.text = element_text(size = 10, color = "#555555"),
+    legend.position = "none"
+  )
+
+# Converter para gráfico interativo
+graf_interativo <- ggplotly(grafbararmsEXP2023, tooltip = "text")
+
+# Exibir
+graf_interativo
+```
+
+## GRÁFICO DE DADOS DE SÉRIE TEMPORAL
+
+No gráfico de dados de série temporal, logo abaixo, é possível identificar a exportação de armas do Brasil durante os anos. Um ponto a ser levado em conta é a baixíssima, ou quase nula, exportação de armas por parte do Brasil. É notável que o Brasil parou de exportar armas durante grande parte da década de 60, o início década de 70, e os anos de 1999, 2000, 2001 e 2003.
+
+```{r}
+#| label: grafseriearmsEXPBR
+#| echo: false
+#| warning: false
+
+library(WDI)
+library(ggplot2)
+library(scales)  # necessário para formatação
+
+# Gráfico atualizado
+grafseriearmsEXPBR <- ggplot(dadosarmsEXPBR,
+                             aes(x = year, y = MS.MIL.XPRT.KD)) +
+  geom_line(color = "forestgreen", size = 1.2) +
+  geom_point(color = "forestgreen", size = 2) +
+  labs(
+    title = "Exportações de Armas do Brasil ao Longo do Tempo",
+    x = "Ano",
+    y = "Exportações de Armas"  # Novo nome do eixo Y
+  ) +
+  scale_y_continuous(
+    labels = label_dollar(prefix = "US$ ", scale = 1e-9, suffix = "B")
+  ) +
+  theme_minimal(base_family = "Helvetica") +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, color = "#333333"),
+    axis.title = element_text(size = 12, color = "#333333"),
+    axis.text = element_text(size = 10, color = "#555555"),
+    legend.position = "none"
+  )
+
+# Converter para gráfico interativo com tooltips personalizados
+grafseriearmsEXPBR_interativo <- ggplotly(grafseriearmsEXPBR, tooltip = "text")
+
+# Exibir
+grafseriearmsEXPBR_interativo
+```
+
+## MAPA
+
+Logo abaixo, segue um gráfico de corte transversal de 2023 em formato de mapa.
+
+```{r}
+#| label: grafmapEXPBR
+#| echo: false
+#| warning: false
+
+# Mapa do mundo
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+# Juntar com dados do WDI usando código ISO3
+mapa_dados <- left_join(world, dadosarmsEXP2023, by = c("iso_a3" = "iso3c"))
+
+# Mapa atualizado
+mapa_arms <- ggplot(mapa_dados) +
+  geom_sf(aes(fill = MS.MIL.XPRT.KD), color = "white", size = 0.1) +
+  geom_sf(data = subset(mapa_dados, country == "Brazil"),
+          aes(fill = MS.MIL.XPRT.KD), color = "black", size = 0.6) +
+  scale_fill_viridis_c(
+    option = "plasma",
+    na.value = "gray90",
+    name = "Exportações",
+    labels = label_dollar(prefix = "US$ ", scale = 1e-9, suffix = "B")  # Formatação em bilhões
+  ) +
+  labs(title = "Mapa de Exportação de Armas (2023)") +
+  theme_minimal(base_family = "Helvetica") +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.grid = element_blank()
+  )
+
+mapa_arms
+```
