@@ -1,0 +1,100 @@
+---
+title: "Evolução dos Preços das Commodities - Agropecuária"
+format: html
+editor: visual
+---
+
+```{r}
+#| label: load-packages
+#| include: false
+
+# Pacotes necessários
+
+library(ggplot2)
+library(gganimate)
+library(dplyr)
+library(scales)
+library(GetBCBData)
+library(tidyverse)
+library(showtext)
+
+# Fonte moderna
+font_add_google("Roboto", "roboto")
+showtext_auto()
+
+# DADOS
+my.id <- c(agropecuária = 29041)
+
+df.bcb <- gbcbd_get_series(id = my.id,
+                           first.date = '1998-01-31',
+                           last.date = Sys.Date(),
+                           format.data = 'long',
+                           use.memoise = TRUE,
+                           cache.path = tempdir(),
+                           do.parallel = FALSE)
+
+glimpse(df.bcb)
+```
+
+## **Preços das Commodities - Agropecuária**
+
+Commodities são produtos naturais com uma mínima industrialização, sendo capazes de serem comercializadas entre países, sendo muito voltada para a exportação, principalmente no Brasil. Exemplos são as commodities:
+
+-   **Agrícolas:** soja, milho, café, algodão, trigo
+
+-   **Energéticas:** petróleo, gás natural, etanol
+
+-   **Minerais e metálicas:** ouro, ferro, cobre, alumínio
+
+Todas elas tem uma variação nos preços conforme o mercado se constituem, em períodos de crescimento econômico e escassez de matéria-prima para a produção, seus preços aumentam, mas em períodos de crise em que se da preferência por bens de necessidade. Em períodos de conflitos globais, elas variam, principalmente por conta de embargos econômicos e altas taxações. Os desastres naturais contribuem para o aumento dos preços por conta de uma forçada diminuição da oferta no mercado.
+
+## **Gráfico em Painel – Variação dos preços das commodities agropecuárias ao longo dos anos**
+
+No gráfico, é possível identificar dois pontos de queda , ambos influenciados por questões financeiras. Em 2008, a economia mundial passava por uma recessão, influenciada pela bolha de crédito dos EUA. Em 2020, o planeta Terra enfrentava um grande atraso graças a um vírus chamado COVID-19.\
+É interessante perceber que nos dois anos houve uma acentuada queda, mas que em questão de 2 a 3 anos, houveram as maiores recuperações já vistas, muito impactados por uma alta na demanda - quando a economia volta a crescer - e por uma baixa oferta, influenciada por uma fuga de agricultores do ramo por uma falta de expectativa de crescimento e valorização do setor.\
+\
+Muitas vezes, uma queda pode ser uma oportunidade para um crescimento ainda maior - "dar um passo pra trás pra poder dar dois pra frente".
+
+```{r}
+#| label: graficodadosempainel
+#| warning: false
+#| echo: false
+
+# GRÁFICO MODERNO E ANIMADO COM EVENTOS HISTÓRICOS
+ggplot(df.bcb, aes(x = ref.date, y = value)) +
+  geom_line(color = "#35AE35", size = 1.5) +
+  geom_point(color = "#35AE35", size = 2, alpha = 0.8) +
+  
+   # EVENTOS: linhas verticais
+  geom_vline(xintercept = as.Date("2008-09-01"), linetype = "dashed",
+             color = "#2C3E50", size = 1) +
+  geom_vline(xintercept = as.Date("2020-03-01"), linetype = "dashed",
+             color = "#2C3E50", size = 1) +
+  
+    # EVENTOS: textos explicativos
+  annotate("text", x = as.Date("2008-09-01"), y = max(df.bcb$value) * 0.93,
+           label = "📉 Crise de 2008", color = "#E67E22", angle = 90, vjust = -0.5, size = 6) +
+  annotate("text", x = as.Date("2020-03-01"), y = max(df.bcb$value) * 0.95,
+           label = "🦠 Pandemia", color = "#E67E22", angle = 90, vjust = -0.5, size = 6) +
+  
+  # Títulos e estilo
+  labs(
+    title = '💹 Preços das Commodities - Agropecuária',
+    subtitle = 'Data: {format(frame_along, "%b/%Y")} — Fonte: Banco Central do Brasil',
+    x = NULL,
+    y = NULL
+  ) +
+  scale_x_date(date_labels = "%Y", date_breaks = "3 years") +
+  scale_y_continuous(labels = label_number(scale_cut = cut_short_scale())) +
+  theme_minimal(base_family = "roboto") +
+  theme(
+    plot.title = element_text(size = 20, face = "bold", color = "#2C3E50"),
+    plot.subtitle = element_text(size = 13, color = "#7F8C8D", margin = margin(b = 10)),
+    axis.text = element_text(size = 10, color = "#34495E"),
+    panel.grid.major = element_line(color = "#ecf0f1"),
+    panel.grid.minor = element_blank(),
+    plot.margin = margin(20, 30, 20, 30),
+    plot.background = element_rect(fill = "white", color = NA)
+  ) +
+  transition_reveal(ref.date)
+```
